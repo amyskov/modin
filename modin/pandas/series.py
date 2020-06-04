@@ -1232,14 +1232,24 @@ class Series(BasePandasDataset):
     def value_counts(
         self, normalize=False, sort=True, ascending=False, bins=None, dropna=True
     ):
-        return self._default_to_pandas(
-            pandas.Series.value_counts,
-            normalize=normalize,
-            sort=sort,
-            ascending=ascending,
-            bins=bins,
-            dropna=dropna,
-        )
+
+        counts = self.groupby(self).size()
+
+        if sort:
+            counts = counts.sort_values(ascending=ascending)
+        if normalize:
+            counts /= counts.sum()
+
+        return counts
+
+        # return self._default_to_pandas(
+        #     pandas.Series.value_counts,
+        #     normalize=normalize,
+        #     sort=sort,
+        #     ascending=ascending,
+        #     bins=bins,
+        #     dropna=dropna,
+        # )
 
     def view(self, dtype=None):
         return self._default_to_pandas(pandas.Series.view, dtype=dtype)

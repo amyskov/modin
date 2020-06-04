@@ -167,6 +167,7 @@ def inter_df_math_helper_one_side(modin_series, pandas_series, op):
 
 def create_test_series(vals):
     if isinstance(vals, dict):
+        print("vals\n", vals)
         modin_series = pd.Series(vals[next(iter(vals.keys()))])
         pandas_series = pandas.Series(vals[next(iter(vals.keys()))])
     elif isinstance(vals, list):
@@ -2724,8 +2725,28 @@ def test_update(data):
 def test_value_counts(data):
     modin_series, pandas_series = create_test_series(data)
 
-    with pytest.warns(UserWarning):
-        modin_series.value_counts()
+    # with pytest.warns(UserWarning):
+    print("pandas_series\n", pandas_series)
+    print("modin_series\n", modin_series)
+    print("pandas_series.value_counts()\n", pandas_series.value_counts())
+    print("modin_series.value_counts()\n", modin_series.value_counts())
+    # df_equals(pandas_series.value_counts(dropna=False), modin_series.value_counts(dropna=False))
+    # df_equals(pandas_series.value_counts(normalize=True), modin_series.value_counts(normalize=True))
+    df_equals(pandas_series.value_counts(sort=False, dropna=False), modin_series.value_counts(sort=False, dropna=False))
+    # np.testing.assert_equal(modin_series.value_counts(), pandas_series.value_counts())
+    # modin_series.value_counts()
+
+
+@pytest.mark.parametrize("data", test_data_values, ids=test_data_keys)
+def test_groupby(data):
+    modin_series, pandas_series = create_test_series(data)
+
+    # with pytest.warns(UserWarning):
+    # print("pandas_series.groupby(pandas_series).size()\n", pandas_series.groupby(pandas_series).size())
+    # print("modin_series.groupby(pandas_series).size()\n", modin_series.groupby(pandas_series).size())
+    df_equals(pandas_series.groupby(pandas_series).size(), modin_series.groupby(modin_series).size())
+    # np.testing.assert_equal(modin_series.value_counts(), pandas_series.value_counts())
+    # modin_series.value_counts()
 
 
 @pytest.mark.parametrize("data", test_data_values, ids=test_data_keys)
