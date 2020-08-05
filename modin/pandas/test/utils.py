@@ -757,6 +757,7 @@ def eval_io(
             pd,
             pandas,
             applyier,
+            comparator=comparator,
             check_exception_type=check_exception_type,
             raising_exceptions=raising_exceptions,
             check_kwargs_callable=check_kwargs_callable,
@@ -1094,7 +1095,7 @@ def dummy_decorator():
     return wrapper
 
 
-def generate_dataframe(row_size=NROWS, additional_col_values=None):
+def generate_dataframe(row_size=NROWS, additional_cols_values=None):
     dates = pandas.date_range("2000", freq="h", periods=row_size)
     data = {
         "col1": np.arange(row_size) * 10,
@@ -1105,11 +1106,12 @@ def generate_dataframe(row_size=NROWS, additional_col_values=None):
         "col6": random_state.uniform(low=0.0, high=10000.0, size=row_size),
     }
 
-    if additional_col_values is not None:
-        assert isinstance(additional_col_values, (list, tuple))
+    if additional_cols_values is not None:
+        assert isinstance(additional_cols_values, dict)
         data.update(
             {
-                "col7": random_state.choice(additional_col_values, size=row_size),
+                col_name: random_state.choice(col_values, size=row_size)
+                for col_name, col_values in additional_cols_values.items()
             }
         )
     return pandas.DataFrame(data)
@@ -1123,7 +1125,7 @@ def _make_csv_file(filenames):
         delimiter=",",
         encoding=None,
         compression="infer",
-        additional_col_values=None,
+        additional_cols_values=None,
         remove_randomness=False,
         add_blank_lines=False,
         add_bad_lines=False,
@@ -1140,7 +1142,7 @@ def _make_csv_file(filenames):
         if os.path.exists(filename) and not force:
             pass
         else:
-            df = generate_dataframe(row_size, additional_col_values)
+            df = generate_dataframe(row_size, additional_cols_values)
             if remove_randomness:
                 df = df[["col1", "col2", "col3", "col4"]]
             if add_nan_lines:

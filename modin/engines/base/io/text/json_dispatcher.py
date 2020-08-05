@@ -18,7 +18,6 @@ from modin.data_management.utils import compute_chunksize
 from io import BytesIO
 import pandas
 import numpy as np
-from csv import QUOTE_NONE
 
 from modin.config import NPartitions
 
@@ -87,9 +86,8 @@ class JSONDispatcher(TextFileDispatcher):
             splits = cls.partitioned_file(
                 f,
                 num_partitions=num_partitions,
-                is_quoting=(args.get("quoting", "") != QUOTE_NONE),
             )
-            for start, end in splits:
+            for start, end, _ in splits:
                 args.update({"start": start, "end": end})
                 partition_id = cls.deploy(cls.parse, num_splits + 3, args)
                 partition_ids.append(partition_id[:-3])
