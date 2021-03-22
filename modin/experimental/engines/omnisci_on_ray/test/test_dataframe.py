@@ -358,6 +358,23 @@ class TestCSV:
             usecols=usecols,
         )
 
+    # General Parsing Configuration
+    @pytest.mark.parametrize("true_values", [["Yes"], ["Yes", "true"], None])
+    @pytest.mark.parametrize("false_values", [["No"], ["No", "false"], None])
+    def test_read_csv_parsing(
+        self,
+        true_values,
+        false_values,
+    ):
+        eval_io(
+            fn_name="read_csv",
+            md_extra_kwargs={"engine": "arrow"},
+            # read_csv kwargs
+            filepath_or_buffer=pytest.csvs_names["test_read_csv_yes_no"],
+            true_values=true_values,
+            false_values=false_values,
+        )
+
 
 class TestMasks:
     data = {
