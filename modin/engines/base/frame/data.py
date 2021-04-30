@@ -27,6 +27,7 @@ from typing import List, Hashable
 from modin.backends.pandas.query_compiler import PandasQueryCompiler
 from modin.error_message import ErrorMessage
 from modin.backends.pandas.parsers import find_common_type_cat as find_common_type
+from modin.config import Backend
 
 
 class BasePandasFrame(object):
@@ -2231,6 +2232,8 @@ class BasePandasFrame(object):
                 df = pandas.DataFrame(columns=self.columns)
             else:
                 df = pandas.DataFrame(columns=self.columns, index=self.index)
+        elif Backend.get() == "Pyarrow":
+            pass
         else:
             for axis in [0, 1]:
                 ErrorMessage.catch_bugs_and_request_email(

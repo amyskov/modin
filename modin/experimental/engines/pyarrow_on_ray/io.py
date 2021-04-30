@@ -32,7 +32,7 @@ class PyarrowOnRayIO(RayIO):
     frame_cls = PyarrowOnRayFrame
     frame_partition_cls = PyarrowOnRayFramePartition
     query_compiler_cls = PyarrowQueryCompiler
-    csv_reader = PyarrowOnRayCSVDispatcher
+    read_csv = PyarrowOnRayCSVDispatcher.read
 
     read_parquet_remote_task = None
     read_hdf_remote_task = None

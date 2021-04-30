@@ -749,6 +749,8 @@ def eval_io(
     def applyier(module, *args, **kwargs):
         result = getattr(module, fn_name)(*args, **kwargs)
         if cast_to_str:
+            if not isinstance(result, (pandas.DataFrame, pandas.Series)):
+                result = to_pandas(result)
             result = result.astype(str)
         return result
 

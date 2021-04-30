@@ -71,9 +71,11 @@ class FileDispatcher:
             import pandas as kernel_lib
         elif Backend.get() == "Cudf":
             import cudf as kernel_lib
+        elif Backend.get() == "Pyarrow":
+            import pandas as kernel_lib
         else:
             raise NotImplementedError("FIXME")
-
+        # import pdb; pdb.set_trace()
         if hasattr(query_compiler, "dtypes") and any(
             isinstance(t, kernel_lib.CategoricalDtype) for t in query_compiler.dtypes
         ):

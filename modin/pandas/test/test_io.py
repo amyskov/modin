@@ -44,7 +44,7 @@ from .utils import (
     generate_dataframe,
 )
 
-from modin.config import Engine, Backend, IsExperimental
+from modin.config import Engine, Backend
 
 if Backend.get() == "Pandas":
     import modin.pandas as pd
@@ -220,10 +220,10 @@ def eval_to_file(modin_obj, pandas_obj, fn, extension, **fn_kwargs):
 
 
 @pytest.mark.usefixtures("TestReadCSVFixture")
-@pytest.mark.skipif(
-    IsExperimental.get() and Backend.get() == "Pyarrow",
-    reason="Segmentation fault; see PR #2347 ffor details",
-)
+# @pytest.mark.skipif(
+#     IsExperimental.get() and Backend.get() == "Pyarrow",
+#     reason="Segmentation fault; see PR #2347 ffor details",
+# )
 class TestCsv:
     # delimiter tests
     @pytest.mark.parametrize("sep", [None, "_", ",", ".", "\n"])
@@ -239,10 +239,12 @@ class TestCsv:
             delimiter=delimiter,
             thousands_separator=thousands,
             decimal_separator=decimal,
+            remove_randomness=True,
         )
 
         eval_io(
             fn_name="read_csv",
+            cast_to_str=True,
             # read_csv kwargs
             filepath_or_buffer=unique_filename,
             delimiter=delimiter,
