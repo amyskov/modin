@@ -196,8 +196,9 @@ class CSVDispatcher(TextFileDispatcher):
             Parameters of read_csv function.
         compression_infered : str
             Inferred `compression` parameter of read_csv function.
-        skiprows_md: list-like, int or callable
+        skiprows_md : list-like, int or callable
                 Modin read_csv `skiprows` parameter.
+
         Returns
         -------
         bool
@@ -369,27 +370,29 @@ class CSVDispatcher(TextFileDispatcher):
         header_size: int = 0,
     ) -> Tuple[Union[int, Sequence, Callable], bool, int]:
         """
-        Manages read_csv `skiprows` parameter in the way modin could
+        Manage read_csv `skiprows` parameter.
+        
+        Change `skiprows` parameter in the way Modin could
         more optimally process it. If `skiprows` is an array, this
         array will be sorted and then, if array is uniformly distributed,
-        `skiprows` will be "squashed" into integer value and `pre_reading` parameter
-        will be set if needed.
+        `skiprows` will be "squashed" into integer value and `pre_reading`
+        parameter will be set if needed.
 
         Parameters
         ----------
-        skiprows: int, array or callable
-                original skiprows parameter of read_csv function
-        header_size: int
-                number of rows that are used by header
+        skiprows : int, array or callable, optional
+                Original skiprows parameter of read_csv function.
+        header_size : int, default: 0
+                Number of rows that are used by header.
 
         Returns
         -------
-        skiprows: int, array or callable
-                updated skiprows parameter
-        pre_reading: int
-                the number of rows that should be read before data file
+        skiprows : int, array or callable
+                Updated skiprows parameter.
+        pre_reading : int
+                The number of rows that should be read before data file
                 splitting for further reading (the number of rows for
-                the first partition)
+                the first partition).
         """
         pre_reading = 0
         uniform_skiprows = False

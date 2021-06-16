@@ -212,17 +212,17 @@ class TextFileDispatcher(FileDispatcher):
             If not specified grabs the value from `modin.config.NPartitions.get()`.
         nrows : int, optional
             Number of rows of file to read.
-        skiprows: array, callable or int, optional
+        skiprows : array, callable or int, optional
             Specifies rows to skip.
         quotechar : bytes, default: b'"'
             Indicate quote in a file.
         is_quoting : bool, default: True
             Whether or not to consider quotes.
-        header_size: int, default 0
+        header_size : int, default: 0
             Number of rows, that occupied by header.
-        pre_reading: int, default 0
+        pre_reading : int, default: 0
             Number of rows between header and skipped rows, that should be read.
-        encoding: str, optional
+        encoding : str, optional
             `encoding` parameter of read_* function.
 
         Returns
@@ -374,20 +374,20 @@ class TextFileDispatcher(FileDispatcher):
             Whether or not to consider quotes.
         outside_quotes : bool, default: True
             Whether the file pointer is within quotes or not at the time this function is called.
-        max_bytes: int, optional
+        max_bytes : int, optional
             The maximum number of bytes, that can be read during function call.
-        skiprows: array or callable, optional
+        skiprows : array or callable, optional
             Specifies rows to skip.
 
         Returns
         -------
-            bool
-                If file pointer reached the end of the file, but did not find
-                closing quote returns `False`. `True` in any other case.
-            int
-                Number of rows that was read (including skipped).
-            int
-                Number of rows that was "considered" (read rows excluding skipped).
+        bool
+            If file pointer reached the end of the file, but did not find
+            closing quote returns `False`. `True` in any other case.
+        int
+            Number of rows that was read (including skipped).
+        int
+            Number of rows that was "considered" (read rows excluding skipped).
         """
         if nrows is None and max_bytes is None:
             max_bytes = float("inf")
@@ -446,17 +446,17 @@ class TextFileDispatcher(FileDispatcher):
 
         Parameters
         ----------
-        skiprows: array or callable
-            skiprows object that should be aligned to the start_row.
-        start_row: int
-            skiprows alignement reference.
-        extra_skiprows: array or int
+        skiprows : array or callable
+            Skiprows object that should be aligned to the start_row.
+        start_row : int
+            Skiprows alignement reference.
+        extra_skiprows : array or int, optional
             Additional rows numbers that should be skipped (indexed
             from start_row).
 
         Returns
         -------
-        new_skiprows: list-like, int or callable
+        new_skiprows : list-like, int or callable
             Skiprows object, aligned to the start_row.
         """
         if extra_skiprows is None:
@@ -484,17 +484,20 @@ class TextFileDispatcher(FileDispatcher):
     @classmethod
     def skiprows_handler_builder(cls, skiprows):
         """
-        Builds function that will iterate over lines numbers and define whatever
+        Build `skiprows` parameter handler.
+
+        Build function that will iterate over lines numbers and define whatever
         iterated line number should be skipped or not in accordance to `skiprows` type.
 
         Parameters
         ----------
-        skiprows: array or callable
+        skiprows : array or callable
             `skiprows` parameter of read_* function.
 
         Returns
         -------
-            object which defines whatever next row should be skipped or not.
+        obj
+            Object which defines whatever next row should be skipped or not.
         """
         if callable(skiprows):
 
@@ -545,7 +548,7 @@ class TextFileDispatcher(FileDispatcher):
             Indicate quote in a file.
         is_quoting : bool
             Whether or not to consider quotes.
-        skiprows: array or callable, optional
+        skiprows : array or callable, optional
             Specifies rows to skip.
 
         Returns
