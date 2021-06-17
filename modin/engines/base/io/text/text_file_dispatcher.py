@@ -24,9 +24,8 @@ import numpy as np
 import warnings
 import io
 import os
-from typing import Union, Sequence, Optional, Tuple, Callable
+from typing import Union, Sequence, Optional, Tuple
 import pandas
-from pandas.core.dtypes.common import is_list_like
 
 from modin.config import NPartitions
 
@@ -177,7 +176,7 @@ class TextFileDispatcher(FileDispatcher):
         # the modin implementation doesn't work correctly in the case, so we must
         # make sure that the line is read completely to the lineterminator,
         # which is what the `_read_rows` does
-        outside_quotes, _, _ = cls._read_rows(
+        outside_quotes, _ = cls._read_rows(
             f,
             nrows=1,
             quotechar=quotechar,
@@ -193,12 +192,11 @@ class TextFileDispatcher(FileDispatcher):
         f,
         num_partitions: int = None,
         nrows: int = None,
-        skiprows: Union[Sequence[int], Callable, int, None] = None,
+        skiprows: int = None,
         quotechar: bytes = b'"',
         is_quoting: bool = True,
         header_size: int = 0,
         pre_reading: int = 0,
-        encoding: str = None,
     ):
         """
         Compute chunk sizes in bytes for every partition.
@@ -212,7 +210,7 @@ class TextFileDispatcher(FileDispatcher):
             If not specified grabs the value from `modin.config.NPartitions.get()`.
         nrows : int, optional
             Number of rows of file to read.
-        skiprows : array, callable or int, optional
+        skiprows : int, optional
             Specifies rows to skip.
         quotechar : bytes, default: b'"'
             Indicate quote in a file.
@@ -222,25 +220,20 @@ class TextFileDispatcher(FileDispatcher):
             Number of rows, that occupied by header.
         pre_reading : int, default: 0
             Number of rows between header and skipped rows, that should be read.
-        encoding : str, optional
-            `encoding` parameter of read_* function.
 
         Returns
         -------
         list
-            List with next elements:
+            List with the next elements:
                 int : partition start read byte
                 int : partition end read byte
-                int, array-like or callable : skiprows object aligned (adopted)
-                    to the exact partition
         """
         read_rows_counter = 0
-        considered_rows_counter = 0
         outside_quotes = True
-        partition_skiprows = 1 if encoding is not None else None
-        should_handle_skiprows = skiprows is not None and not isinstance(skiprows, int)
+
         if num_partitions is None:
             num_partitions = NPartitions.get() - 1 if pre_reading else NPartitions.get()
+
         file_size = cls.file_size(f)
 
         if nrows:
@@ -251,14 +244,12 @@ class TextFileDispatcher(FileDispatcher):
         rows_skipper = cls.rows_skipper_builder(f, quotechar, is_quoting=is_quoting)
         result = []
 
-        read_rows_counter += rows_skipper(
-            header_size, skiprows=(skiprows if should_handle_skiprows else None)
-        )
+        rows_skipper(header_size)
 
         if pre_reading:
-            considered_rows_counter += pre_reading
+            # considered_rows_counter += pre_reading
             pre_reading_start = f.tell()
-            outside_quotes, read_rows, _ = cls._read_rows(
+            outside_quotes, read_rows = cls._read_rows(
                 f,
                 nrows=pre_reading,
                 quotechar=quotechar,
@@ -267,19 +258,41 @@ class TextFileDispatcher(FileDispatcher):
             )
             read_rows_counter += read_rows
 
-            result.append((pre_reading_start, f.tell(), partition_skiprows))
+            result.append((pre_reading_start, f.tell()))
 
             # add outside_quotes
             if is_quoting and not outside_quotes:
                 warnings.warn("File has mismatched quotes")
 
-        if skiprows is not None and isinstance(skiprows, int):
-            read_rows_counter += rows_skipper(skiprows)
-            skiprows = None
+        # if skiprows is not None and isinstance(skiprows, int):
+        #     read_rows_counter += rows_skipper(skiprows)
+        #     skiprows = None
+        rows_skipper(skiprows)
 
         start = f.tell()
 
-        if not should_handle_skiprows and nrows is None:
+        if nrows:
+            # read_rows_counter = 0
+            partition_size = max(1, num_partitions, nrows // num_partitions)
+            while f.tell() < file_size and read_rows_counter < nrows:
+                if read_rows_counter + partition_size > nrows:
+                    # it's possible only if is_quoting==True
+                    partition_size = nrows - read_rows_counter
+                outside_quotes, read_rows = cls._read_rows(
+                    f,
+                    nrows=partition_size,
+                    quotechar=quotechar,
+                    is_quoting=is_quoting,
+                )
+                result.append((start, f.tell()))
+                start = f.tell()
+                read_rows_counter += read_rows
+
+                # add outside_quotes
+                if is_quoting and not outside_quotes:
+                    warnings.warn("File has mismatched quotes")
+        else:
+            partition_size = max(1, num_partitions, file_size // num_partitions)
             while f.tell() < file_size:
                 outside_quotes = cls.offset(
                     f,
@@ -287,60 +300,9 @@ class TextFileDispatcher(FileDispatcher):
                     quotechar=quotechar,
                     is_quoting=is_quoting,
                 )
-                result.append((start, f.tell(), partition_skiprows))
+
+                result.append((start, f.tell()))
                 start = f.tell()
-
-                # add outside_quotes
-                if is_quoting and not outside_quotes:
-                    warnings.warn("File has mismatched quotes")
-        else:
-            read = f.tell() if nrows is None else considered_rows_counter
-            read_limit = file_size if nrows is None else nrows
-            while f.tell() < file_size and read < read_limit:
-                if should_handle_skiprows:
-                    skiprows_deploy_arg = cls.handle_skiprows(
-                        skiprows=skiprows,
-                        # if encoding is not None, parser will read additional line
-                        # with header
-                        start_row=read_rows_counter - 1
-                        if encoding is not None
-                        else read_rows_counter,
-                        extra_skiprows=list(range(partition_skiprows))
-                        if partition_skiprows
-                        else None,
-                    )
-                    skiprows_read_rows_arg = cls.handle_skiprows(
-                        skiprows=skiprows,
-                        start_row=read_rows_counter,
-                    )
-                else:
-                    rows_considered = read_rows_counter
-                    skiprows_deploy_arg = (
-                        partition_skiprows + skiprows
-                        if skiprows is not None
-                        else partition_skiprows
-                    )
-                    skiprows_read_rows_arg = (
-                        skiprows if skiprows is not None else partition_skiprows
-                    )
-
-                if (read + partition_size) > read_limit:
-                    partition_size = read_limit - read
-
-                outside_quotes, read_rows, rows_considered = cls._read_rows(
-                    f,
-                    nrows=partition_size if nrows else None,
-                    quotechar=quotechar,
-                    is_quoting=is_quoting,
-                    outside_quotes=outside_quotes,
-                    max_bytes=partition_size if nrows is None else None,
-                    skiprows=skiprows_read_rows_arg,
-                )
-                if rows_considered != 0:
-                    result.append((start, f.tell(), skiprows_deploy_arg))
-                start = f.tell()
-                read_rows_counter += read_rows
-                read = f.tell() if nrows is None else read + rows_considered
 
                 # add outside_quotes
                 if is_quoting and not outside_quotes:
@@ -356,8 +318,6 @@ class TextFileDispatcher(FileDispatcher):
         quotechar: bytes = b'"',
         is_quoting: bool = True,
         outside_quotes: bool = True,
-        max_bytes: int = None,
-        skiprows: Union[Sequence[int], Callable, None] = None,
     ):
         """
         Move the file offset at the specified amount of rows.
@@ -374,169 +334,37 @@ class TextFileDispatcher(FileDispatcher):
             Whether or not to consider quotes.
         outside_quotes : bool, default: True
             Whether the file pointer is within quotes or not at the time this function is called.
-        max_bytes : int, optional
-            The maximum number of bytes, that can be read during function call.
-        skiprows : array or callable, optional
-            Specifies rows to skip.
 
         Returns
         -------
         bool
-            If file pointer reached the end of the file, but did not find
-            closing quote returns `False`. `True` in any other case.
+            If file pointer reached the end of the file, but did not find closing quote
+            returns `False`. `True` in any other case.
         int
-            Number of rows that was read (including skipped).
-        int
-            Number of rows that was "considered" (read rows excluding skipped).
+            Number of rows that were read.
         """
-        if nrows is None and max_bytes is None:
-            max_bytes = float("inf")
-
         if nrows is not None and nrows <= 0:
-            return True, 0, 0
+            return True, 0
 
-        # we need this condition to avoid unnecessary checks in `stop_condition`
-        # which executes in a huge for loop
-        if nrows is not None and max_bytes is None:
-            stop_condition = lambda rows_read: rows_read >= nrows  # noqa (E731)
-        elif nrows is not None and max_bytes is not None:
-            stop_condition = (
-                lambda rows_read: f.tell() >= max_bytes or rows_read >= nrows
-            )  # noqa (E731)
-        else:
-            stop_condition = lambda rows_read: f.tell() >= max_bytes  # noqa (E731)
-
-        if max_bytes is not None:
-            max_bytes = max_bytes + f.tell()
-
-        rows_considered = 0
         rows_read = 0
-
-        should_handle_skiprows = skiprows is not None and not isinstance(skiprows, int)
-
-        if should_handle_skiprows:
-            skiprows_handler = cls.skiprows_handler_builder(skiprows)
 
         for line in f:
             if is_quoting and line.count(quotechar) % 2:
                 outside_quotes = not outside_quotes
             if outside_quotes:
-                if should_handle_skiprows:
-                    rows_considered += next(skiprows_handler)
-                else:
-                    rows_considered += 1
                 rows_read += 1
-                if stop_condition(rows_read=rows_considered):
+                if rows_read >= nrows:
                     break
+
         # case when EOF
         if not outside_quotes:
             rows_read += 1
 
-        return outside_quotes, rows_read, rows_considered
-
-    @classmethod
-    def handle_skiprows(
-        cls,
-        skiprows: Union[Sequence[int], Callable, None],
-        start_row: int,
-        extra_skiprows: Union[Sequence, int, None] = None,
-    ) -> Union[int, Sequence, Callable]:
-        """
-        Handle skiprows parameter according to the reference start_row.
-
-        Parameters
-        ----------
-        skiprows : array or callable
-            Skiprows object that should be aligned to the start_row.
-        start_row : int
-            Skiprows alignement reference.
-        extra_skiprows : array or int, optional
-            Additional rows numbers that should be skipped (indexed
-            from start_row).
-
-        Returns
-        -------
-        new_skiprows : list-like, int or callable
-            Skiprows object, aligned to the start_row.
-        """
-        if extra_skiprows is None:
-            extra_skiprows = []
-        elif not isinstance(extra_skiprows, (list, tuple)):
-            extra_skiprows = [extra_skiprows]
-
-        def skiprows_wrapper(n):
-            return n in extra_skiprows or skiprows(n + start_row)
-
-        if callable(skiprows):
-            new_skiprows = skiprows_wrapper
-        elif is_list_like(skiprows):
-            start = np.searchsorted(skiprows, start_row)
-            new_skiprows = np.concatenate(
-                [extra_skiprows, skiprows[start:] - start_row]
-            )
-            if len(extra_skiprows) > 0:
-                new_skiprows = np.sort(new_skiprows)
-        else:
-            new_skiprows = skiprows
-
-        return new_skiprows
-
-    @classmethod
-    def skiprows_handler_builder(cls, skiprows):
-        """
-        Build `skiprows` parameter handler.
-
-        Build function that will iterate over lines numbers and define whatever
-        iterated line number should be skipped or not in accordance to `skiprows` type.
-
-        Parameters
-        ----------
-        skiprows : array or callable
-            `skiprows` parameter of read_* function.
-
-        Returns
-        -------
-        obj
-            Object which defines whatever next row should be skipped or not.
-        """
-        if callable(skiprows):
-
-            def stepper():
-                row_number = 0
-                while True:
-                    yield not skiprows(row_number)
-                    row_number += 1
-
-        elif is_list_like(skiprows):
-            # if skiprows is an array, elements of skiprows
-            # will compared with increased on each step row_number.
-            # If match of row_number and skiprows element is occured,
-            # 0 is yielded and next element of skiprows will be compared
-            # further (skiprows should be sorted).
-            def stepper():
-                row_number = 0
-                index_to_compare = 0
-                while index_to_compare < len(skiprows):
-                    if skiprows[index_to_compare] == row_number:
-                        index_to_compare += 1
-                        yield 0
-                    else:
-                        yield 1
-                    row_number += 1
-                while True:
-                    yield 1
-
-        else:
-
-            def stepper():
-                while True:
-                    yield 1
-
-        return stepper()
+        return outside_quotes, rows_read
 
     # _read helper functions
     @classmethod
-    def rows_skipper_builder(cls, f, quotechar, is_quoting, skiprows=None):
+    def rows_skipper_builder(cls, f, quotechar, is_quoting):
         """
         Build object for skipping passed number of lines.
 
@@ -548,24 +376,23 @@ class TextFileDispatcher(FileDispatcher):
             Indicate quote in a file.
         is_quoting : bool
             Whether or not to consider quotes.
-        skiprows : array or callable, optional
-            Specifies rows to skip.
 
         Returns
         -------
         object
             skipper object.
         """
-        _skiprows = skiprows
 
-        def skipper(n, skiprows=_skiprows):
-            return cls._read_rows(
-                f,
-                quotechar=quotechar,
-                is_quoting=is_quoting,
-                nrows=n,
-                skiprows=skiprows,
-            )[1]
+        def skipper(n):
+            if n == 0 or n is None:
+                return 0
+            else:
+                return cls._read_rows(
+                    f,
+                    quotechar=quotechar,
+                    is_quoting=is_quoting,
+                    nrows=n,
+                )[1]
 
         return skipper
 
@@ -674,14 +501,8 @@ class TextFileDispatcher(FileDispatcher):
         partition_ids = []
         index_ids = []
         dtypes_ids = []
-        for split_data in splits:
-            partition_kwargs.update(
-                {
-                    "start": split_data[0],
-                    "end": split_data[1],
-                    "skiprows": split_data[2],
-                }
-            )
+        for start, end in splits:
+            partition_kwargs.update({"start": start, "end": end})
             partition_id = cls.deploy(
                 cls.parse, partition_kwargs.get("num_splits") + 2, partition_kwargs
             )
