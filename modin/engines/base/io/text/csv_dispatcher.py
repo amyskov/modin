@@ -91,7 +91,6 @@ class CSVDispatcher(TextFileDispatcher):
             filepath_or_buffer,
             kwargs,
             compression_infered,
-            skiprows_md,
         )
         if not use_modin_impl:
             return cls.single_worker_read(filepath_or_buffer, **kwargs)
@@ -196,7 +195,6 @@ class CSVDispatcher(TextFileDispatcher):
         filepath_or_buffer: FilePathOrBuffer,
         read_csv_kwargs: ReadCsvKwargsType,
         compression_infered: str,
-        skiprows_md: Union[int, Sequence, Callable],
     ) -> bool:
         """
         Check if passed parameters are supported by current `read_csv` implementation.
@@ -209,8 +207,6 @@ class CSVDispatcher(TextFileDispatcher):
             Parameters of read_csv function.
         compression_infered : str
             Inferred `compression` parameter of read_csv function.
-        skiprows_md : list-like, int or callable
-                Modin read_csv `skiprows` parameter.
 
         Returns
         -------
@@ -252,13 +248,6 @@ class CSVDispatcher(TextFileDispatcher):
                 ),
             )
         )
-        should_handle_skiprows = skiprows_md is not None and not isinstance(
-            skiprows_md, int
-        )
-        columns_number = len(dummy_df.columns)
-        # In this case parallel implementation inefficient (issue-#2734)
-        if columns_number < 32 and should_handle_skiprows:
-            return False
 
         return True
 
