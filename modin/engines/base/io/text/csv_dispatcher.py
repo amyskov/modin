@@ -232,23 +232,6 @@ class CSVDispatcher(TextFileDispatcher):
         if read_csv_kwargs.get("chunksize") is not None:
             return False
 
-        # `chunksize=1` is used instead of `nrows=0` in order to decrease
-        # `dummy_df` creation time
-        dummy_df = next(
-            pandas.read_csv(
-                filepath_or_buffer,
-                **dict(
-                    read_csv_kwargs,
-                    skiprows=None,
-                    skipfooter=0,
-                    usecols=None,
-                    index_col=None,
-                    names=None,
-                    chunksize=1,
-                ),
-            )
-        )
-
         return True
 
     @classmethod
@@ -367,33 +350,31 @@ class CSVDispatcher(TextFileDispatcher):
         if skiprows_md is not None:
             # skip rows that passed as array or callable
             nrows = kwargs.get("nrows", None)
-            index = new_query_compiler.index
-            is_MultiIndex = isinstance(index, pandas.MultiIndex)
+            index_range = pandas.RangeIndex(len(new_query_compiler.index))
             if is_list_like(skiprows_md):
-                new_query_compiler = new_query_compiler.drop(
-                    index[skiprows_md - header_size]
+                new_query_compiler = new_query_compiler.view(
+                    index=index_range.delete(skiprows_md - header_size)
                 )
             elif callable(skiprows_md):
-                if is_MultiIndex:
-                    skip_mask = skiprows_md(
-                        pandas.RangeIndex(len(index)) + header_size
-                    ).astype("bool")
-                else:
-                    skip_mask = skiprows_md(
-                        new_query_compiler.index + header_size
-                    ).astype("bool")
-                new_query_compiler = new_query_compiler.drop(index[skip_mask])
+                mod_index = skiprows_md(index_range + header_size)
+                mod_index = (
+                    mod_index
+                    if isinstance(mod_index, np.ndarray)
+                    else mod_index.to_numpy("bool")
+                )
+                view_idx = index_range[~mod_index]
+                new_query_compiler = new_query_compiler.view(index=view_idx)
             else:
                 raise TypeError(
                     f"Not acceptable type of `skiprows` parameter: {type(skiprows_md)}"
                 )
 
-            if not is_MultiIndex:
+            if not isinstance(new_query_compiler.index, pandas.MultiIndex):
                 new_query_compiler = new_query_compiler.reset_index(drop=True)
 
             if nrows:
-                new_query_compiler = new_query_compiler.drop(
-                    new_query_compiler.index[nrows:]
+                new_query_compiler = new_query_compiler.view(
+                    pandas.RangeIndex(len(new_query_compiler.index))[:nrows]
                 )
         if kwargs.get("squeeze", False) and len(new_query_compiler.columns) == 1:
             return new_query_compiler[new_query_compiler.columns[0]]
