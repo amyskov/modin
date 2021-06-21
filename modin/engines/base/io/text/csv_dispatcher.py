@@ -59,10 +59,10 @@ class CSVDispatcher(TextFileDispatcher):
 
         Notes
         -----
-        `skiprows` is handled diferently based on the parameter type:
-        If `skiprows` is integer - rows will be skipped during data file partitioning
-        and wouldn't be actually read. If `skiprows` is array or callable - full data
-        file will be read and only then rows will be dropped.
+        `skiprows` is handled diferently based on the parameter type because of
+        performance reasons. If `skiprows` is integer - rows will be skipped during
+        data file partitioning and wouldn't be actually read. If `skiprows` is array
+        or callable - full data file will be read and only then rows will be dropped.
         """
         filepath_or_buffer_md = (
             cls.get_path(filepath_or_buffer)
@@ -88,9 +88,7 @@ class CSVDispatcher(TextFileDispatcher):
         )
 
         use_modin_impl = cls._read_csv_check_support(
-            filepath_or_buffer,
-            kwargs,
-            compression_infered,
+            filepath_or_buffer, kwargs, compression_infered
         )
         if not use_modin_impl:
             return cls.single_worker_read(filepath_or_buffer, **kwargs)
@@ -392,11 +390,11 @@ class CSVDispatcher(TextFileDispatcher):
         """
         Manage read_csv `skiprows` parameter.
 
-        Change `skiprows` parameter in the way Modin could
-        more optimally process it. If `skiprows` is an array, this
-        array will be sorted and then, if array is uniformly distributed,
-        `skiprows` will be "squashed" into integer value and `pre_reading`
-        parameter will be set if needed.
+        Change `skiprows` parameter in the way Modin could more optimally
+        process it. If `skiprows` is an array, this array will be sorted and
+        then, if array is uniformly distributed, `skiprows` will be "squashed"
+        into integer value and `pre_reading` parameter will be set if needed
+        (in this case fastpath can be done).
 
         Parameters
         ----------

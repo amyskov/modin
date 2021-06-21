@@ -293,7 +293,6 @@ def TestReadCSVFixture():
         "test_read_csv_yes_no",
         "test_read_csv_nans",
         "test_read_csv_bad_lines",
-        "test_read_csv_regular_wide",
     ]
     # each xdist worker spawned in separate process with separate namespace and dataset
     pytest.csvs_names = {file_id: get_unique_filename() for file_id in files_ids}
@@ -304,7 +303,7 @@ def TestReadCSVFixture():
     # test_read_csv_parsing
     _make_csv_file(filenames)(
         filename=pytest.csvs_names["test_read_csv_yes_no"],
-        additional_cols_values={"col7": ["Yes", "true", "No", "false"]},
+        additional_col_values=["Yes", "true", "No", "false"],
     )
     # test_read_csv_col_handling
     _make_csv_file(filenames)(
@@ -315,21 +314,12 @@ def TestReadCSVFixture():
     _make_csv_file(filenames)(
         filename=pytest.csvs_names["test_read_csv_nans"],
         add_blank_lines=True,
-        additional_cols_values={
-            "col7": ["<NA>", "N/A", "NA", "NULL", "custom_nan", "73"]
-        },
+        additional_col_values=["<NA>", "N/A", "NA", "NULL", "custom_nan", "73"],
     )
     # test_read_csv_error_handling
     _make_csv_file(filenames)(
         filename=pytest.csvs_names["test_read_csv_bad_lines"],
         add_bad_lines=True,
-    )
-    # test_read_csv_parsing
-    _make_csv_file(filenames)(
-        filename=pytest.csvs_names["test_read_csv_regular_wide"],
-        additional_cols_values={
-            f"col{col_number}": np.arange(10) for col_number in range(7, 37)
-        },
     )
 
     yield

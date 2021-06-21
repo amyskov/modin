@@ -362,8 +362,8 @@ class TestCsv:
     @pytest.mark.parametrize(
         "names",
         [
-            [f"c{col_number}" for col_number in range(34)],
-            [f"c{col_number}" for col_number in range(36)],
+            [f"c{col_number}" for col_number in range(4)],
+            [f"c{col_number}" for col_number in range(6)],
             None,
         ],
     )
@@ -383,17 +383,11 @@ class TestCsv:
             make_csv_file(
                 filename=unique_filename,
                 encoding=encoding,
-                # currently read_csv with skiprows parameter and narrow DataFrames (numer of columms < 32)
-                # are fallbacked to pandas implementation, so we need to use `wide` test file to trigger
-                # modin implementation
-                additional_cols_values={
-                    f"col{col_number}": np.arange(10) for col_number in range(7, 37)
-                },
             )
         kwargs = {
             "filepath_or_buffer": unique_filename
             if encoding
-            else pytest.csvs_names["test_read_csv_regular_wide"],
+            else pytest.csvs_names["test_read_csv_regular"],
             "header": header,
             "skiprows": skiprows,
             "nrows": nrows,
