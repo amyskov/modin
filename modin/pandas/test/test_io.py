@@ -378,6 +378,17 @@ class TestCsv:
         names,
         encoding,
     ):
+        xfail_case = (
+            Backend.get() == "Omnisci"
+            and header is not None
+            and isinstance(skiprows, int)
+            and names is None
+            and nrows is None
+        )
+        if xfail_case:
+            pytest.xfail(
+                "read_csv fails because of duplicated columns names - issue #3080"
+            )
         if encoding:
             unique_filename = get_unique_filename()
             make_csv_file(
@@ -426,26 +437,13 @@ class TestCsv:
         skipfooter,
         nrows,
     ):
-        xfail_case_1 = (
+        xfail_case = (
             (false_values or true_values)
             and Engine.get() != "Python"
             and Backend.get() != "Omnisci"
         )
-        xfail_case_2 = (
-            Backend.get() == "Omnisci"
-            and isinstance(skiprows, int)
-            and names is None
-            and skipfooter == 0
-            and nrows is None
-            and not true_values
-            and not false_values
-        )
-        if xfail_case_1:
+        if xfail_case:
             pytest.xfail("modin and pandas dataframes differs - issue #2446")
-        if xfail_case_2:
-            pytest.xfail(
-                "read_csv fails because of duplicated columns names - issue #3080"
-            )
         if request.config.getoption("--simulate-cloud").lower() != "off":
             pytest.xfail(
                 reason="The reason of tests fail in `cloud` mode is unknown for now - issue #2340"
